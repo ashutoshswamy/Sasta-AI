@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sasta AI - Chat</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles/chat.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>SASTA AI</h1>
+      </div>
+      <div class="chat-container">
+        <div id="chat-messages"></div>
+        <div class="loading" id="loading">Thinking...</div>
+        <div class="input-container">
+          <div class="input-wrapper">
+            <textarea
+              id="user-input"
+              placeholder="Type your message here..."
+              rows="1"
+            ></textarea>
+            <button id="send-button">Send</button>
+          </div>
+        </div>
+      </div>
+      <div class="back-div">
+        <a href="./index.html"
+          ><button id="home-button">Back to Home Page</button></a
+        >
+      </div>
+    </div>
+
+    <script>
+      const API_KEY = "YOUR API KEY";
+
+      const userInput = document.getElementById("user-input");
+      const sendButton = document.getElementById("send-button");
+      const chatMessages = document.getElementById("chat-messages");
+      const loadingIndicator = document.getElementById("loading");
+
+      marked.setOptions({
+        highlight: function (code, language) {
+          if (language && hljs.getLanguage(language)) {
+            return hljs.highlight(code, { language: language }).value;
+          }
+          return hljs.highlightAuto(code).value;
+        },
+        breaks: true,
+      });
+
+      userInput.addEventListener("input", function () {
+        this.style.height = "auto";
+        this.style.height = this.scrollHeight + "px";
+      });
+
+      userInput.addEventListener("keypress", function (e) {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+
+      sendButton.addEventListener("click", sendMessage);
+
+      async function sendMessage() {
+        const message = userInput.value.trim();
+        if (!message) return;
+
+        userInput.disabled = true;
+        sendButton.disabled = true;
+        loadingIndicator.style.display = "block";
+
+        appendMessage(message, "user");
+        userInput.value = "";
+        userInput.style.height = "auto";
+
+        try {
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    parts: [
+                      {
+                        text: message,
+                      },
+                    ],
+                  },
+                ],
+              }),
+            }
+          );
+
+          const data = await response.json();
+
+          if (data.candidates && data.candidates[0].content.parts[0].text) {
+            const aiResponse = data.candidates[0].content.parts[0].text;
+            appendMessage(aiResponse, "ai");
+          } else {
+            throw new Error("Invalid response from API");
+          }
+        } catch (error) {
+          appendMessage(
+            "Sorry, there was an error processing your request. Please try again.",
+            "ai"
+          );
+          console.error("Error:", error);
+        }
+
+        userInput.disabled = false;
+        sendButton.disabled = false;
+        loadingIndicator.style.display = "none";
+        userInput.focus();
+      }
+
+      function appendMessage(message, sender) {
+        const messageDiv = document.createElement("div");
+        messageDiv.className = `message ${sender}-message`;
+
+        messageDiv.innerHTML = marked.parse(message);
+
+        renderMathInElement(messageDiv, {
+          delimiters: [
+            { left: "$$", right: "$$", display: true },
+            { left: "$", right: "$", display: false },
+          ],
+          throwOnError: false,
+        });
+
+        messageDiv.querySelectorAll("pre code").forEach((block) => {
+          hljs.highlightElement(block);
+        });
+
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+    </script>
+  </body>
+</html>
